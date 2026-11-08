@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1565c0">
+<link rel="manifest" href="manifest.json">
+<title>Garment Quality Checklist</title>
+<style>
+:root{--primary:#1565c0;--bg:#f4f7fb;--card:#fff;--danger:#b71c1c;--ok:#2e7d32}
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:#1f2937}
+header{background:var(--primary);color:#fff;padding:18px 16px;position:sticky;top:0;z-index:5}
+header h1{margin:0;font-size:20px}header p{margin:5px 0 0;opacity:.9;font-size:13px}
+.container{max-width:900px;margin:auto;padding:16px}.card{background:#fff;border-radius:12px;padding:16px;margin-bottom:14px;box-shadow:0 2px 8px #00000012}
+h2{font-size:18px;margin:0 0 12px}h3{margin:16px 0 8px;padding:10px;background:#e8f0fe;border-left:5px solid var(--primary);border-radius:5px}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}label{display:block;font-size:12px;font-weight:bold;margin-bottom:4px}
+input,textarea,select{width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:7px;font-size:14px;background:white}textarea{min-height:58px}
+.tabs{display:flex;gap:8px;margin-bottom:14px}.tab{flex:1;border:0;padding:12px;border-radius:8px;background:#dbeafe;color:#174ea6;font-weight:bold}.tab.active{background:var(--primary);color:white}
+.checkpoint{border:1px solid #e2e8f0;padding:12px;border-radius:10px;margin:8px 0}.checkpoint-title{font-weight:bold;margin-bottom:10px}
+.status{font-size:12px;margin-top:5px;min-height:16px}.valid{color:var(--ok)}.invalid{color:var(--danger)}
+.signature-box{border:2px dashed #94a3b8;border-radius:8px;background:#fff;width:100%;height:140px;touch-action:none;display:block}
+.sig-tools{display:flex;justify-content:space-between;align-items:center;margin-top:5px;font-size:12px;color:#64748b}
+.clear-btn{border:0;background:#e2e8f0;padding:6px 10px;border-radius:6px;font-weight:bold}
+.actions{display:flex;gap:10px;position:sticky;bottom:0;background:var(--bg);padding:10px 0}.actions button{flex:1;padding:13px;border:0;border-radius:8px;font-weight:bold}.primary{background:var(--primary);color:#fff}.secondary{background:#475569;color:#fff}
+.note{font-size:12px;color:#64748b;margin:0 0 10px}
+@media(max-width:600px){.grid{grid-template-columns:1fr}}
+@media print{header,.tabs,.actions,.clear-btn{display:none!important}.card{box-shadow:none;border:1px solid #ddd}.container{max-width:none;padding:0}}
+</style>
+</head>
+<body>
+<header><h1>Garment Quality Checklist</h1><p>Fixed template • Touch signature in Remarks</p></header>
+<div class="container">
+<div class="card"><h2>Report Information</h2><div class="grid">
+<div><label>Buyer</label><input id="buyer"></div><div><label>Style</label><input id="style"></div>
+<div><label>Color</label><input id="color"></div><div><label>Date</label><input id="date" type="date"></div>
+<div><label>Line No.</label><input id="lineNo"></div></div></div>
+
+<div class="tabs"><button class="tab active" onclick="showSession('before',this)">Before Lunch</button><button class="tab" onclick="showSession('after',this)">After Lunch</button></div>
+
+<div class="card"><p class="note">🔒 Process names and checkpoint names are fixed and read-only. ✍️ The Remarks area is a touch signature pad.</p><div id="checklist"></div></div>
+
+<div class="card"><h2>Report Approval</h2><div class="grid">
+<div><label>Reported By</label><input id="reportedBy"></div><div><label>Line Tech</label><input id="lineTech"></div>
+<div><label>AM/PM</label><select id="ampm"><option>AM</option><option>PM</option></select></div><div><label>QM</label><input id="qm"></div>
+</div></div>
+<div class="actions"><button class="secondary" onclick="saveReport()">💾 Save</button><button class="primary" onclick="exportPDF()">📄 Export / Print PDF</button></div>
+</div>
+
+<script>
+const template={"Sleeve Setting":["Shirring","Cut Mark","Seam Allowance","Armhole Tape Attach","Sleeve Foam Attachment"],"Lapel":["Lapel Marking","Lapel Fullness","Lapel Pressing"],"Collar":["Collar Making","Collar Pressing","Collar Joining"],"Back Seam":["Panel Joining","Cut Mark","Machine Adjustment"]};
+let session="before",data={before:{},after:{}};
+Object.entries(template).forEach(([p,items])=>items.forEach(n=>{let k=p+"|"+n;data.before[k]={checkQty:"",ok:"",notOk:"",rootCause:"",signature:""};data.after[k]={checkQty:"",ok:"",notOk:"",rootCause:"",signature:""};}));
+
+function render(){
+ let o="";
+ Object.entries(template).forEach(([p,items])=>{
+  o+=`<h3>${p}</h3>`;
+  items.forEach(n=>{
+   let k=p+"|"+n,e=data[session][k];
+   let valid=e.checkQty===""||e.ok===""||e.notOk===""||(Number(e.ok)+Number(e.notOk)===Number(e.checkQty));
+   o+=`<div class="checkpoint">
+   <div class="checkpoint-title">${n}</div>
+   <div class="grid">
+   <div><label>Check Qty</label><input type="number" min="0" value="${e.checkQty}" oninput="setEntry('${k}','checkQty',this.value)"></div>
+   <div><label>OK</label><input type="number" min="0" value="${e.ok}" oninput="setEntry('${k}','ok',this.value)"></div>
+   <div><label>Not OK</label><input type="number" min="0" value="${e.notOk}" oninput="setEntry('${k}','notOk',this.value)"></div>
+   </div>
+   <div class="status ${valid?'valid':'invalid'}">${valid?'':'⚠ OK + Not OK must equal Check Qty'}</div>
+   <div class="grid">
+   <div><label>Root Cause (If Not Okay)</label><textarea oninput="setEntry('${k}','rootCause',this.value)">${e.rootCause}</textarea></div>
+   <div><label>Remarks / Signature (Touch & Draw)</label>
+     <canvas class="signature-box" id="sig-${id(k)}"></canvas>
+     <div class="sig-tools"><span>✍️ Sign with your finger</span><button class="clear-btn" onclick="clearSignature('${k}')">Clear</button></div>
+   </div></div></div>`;
+  });
+ });
+ document.getElementById("checklist").innerHTML=o;
+ Object.entries(template).forEach(([p,items])=>items.forEach(n=>initSignature(p+"|"+n)));
+}
+function id(k){return btoa(unescape(encodeURIComponent(k))).replace(/[^a-zA-Z0-9]/g,"");}
+function setEntry(k,f,v){
+ data[session][k][f]=v;
+ // Do not re-render the entire checklist while typing. Re-rendering replaces the
+ // page DOM and causes Android WebView to jump back to the top.
+ if(["checkQty","ok","notOk"].includes(f)){
+   const valid=data[session][k].checkQty===""||data[session][k].ok===""||data[session][k].notOk===""||
+     (Number(data[session][k].ok)+Number(data[session][k].notOk)===Number(data[session][k].checkQty));
+   const inputs=[...document.querySelectorAll('#checklist input')];
+   const current=inputs.find(el=>el.oninput && el.closest('.checkpoint') && el.closest('.checkpoint').querySelector('.checkpoint-title')?.textContent===k.split('|')[1]);
+   if(current){
+     const status=current.closest('.checkpoint').querySelector('.status');
+     if(status){status.className='status '+(valid?'valid':'invalid');status.textContent=valid?'':'⚠ OK + Not OK must equal Check Qty';}
+   }
+ }
+}
+
+function initSignature(key){
+ const canvas=document.getElementById("sig-"+id(key)); if(!canvas)return;
+ const ctx=canvas.getContext("2d"), saved=data[session][key].signature;
+ function resize(){
+   const old=canvas.toDataURL();
+   const r=canvas.getBoundingClientRect(), ratio=window.devicePixelRatio||1;
+   canvas.width=r.width*ratio; canvas.height=r.height*ratio;
+   ctx.scale(ratio,ratio); ctx.lineWidth=2.5; ctx.lineCap="round"; ctx.strokeStyle="#111";
+   if(saved){let img=new Image();img.onload=()=>ctx.drawImage(img,0,0,r.width,r.height);img.src=saved;}
+ }
+ resize();
+ let drawing=false,last=null;
+ function point(e){let r=canvas.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};}
+ canvas.addEventListener("pointerdown",e=>{drawing=true;canvas.setPointerCapture(e.pointerId);last=point(e);});
+ canvas.addEventListener("pointermove",e=>{if(!drawing)return;let p=point(e);ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(p.x,p.y);ctx.stroke();last=p;});
+ canvas.addEventListener("pointerup",()=>{drawing=false;data[session][key].signature=canvas.toDataURL("image/png");});
+ canvas.addEventListener("pointercancel",()=>{drawing=false;});
+}
+function clearSignature(key){data[session][key].signature="";render();}
+function showSession(s,b){session=s;document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));b.classList.add("active");render();}
+function headerData(){return{buyer:buyer.value,style:style.value,color:color.value,date:date.value,lineNo:lineNo.value,reportedBy:reportedBy.value,lineTech:lineTech.value,ampm:ampm.value,qm:qm.value};}
+function exportPDF(){
+  if (window.AndroidPrint && AndroidPrint.printDocument) {
+    AndroidPrint.printDocument();
+  } else {
+    window.print();
+  }
+}
+function saveReport(){localStorage.setItem("garmentChecklistSignatureReport",JSON.stringify({header:headerData(),data}));alert("Report and signatures saved successfully.");}
+function loadReport(){let s=localStorage.getItem("garmentChecklistSignatureReport");if(!s)return;let r=JSON.parse(s);Object.entries(r.header||{}).forEach(([k,v])=>{let el=document.getElementById(k);if(el)el.value=v});if(r.data)data=r.data;}
+if("serviceWorker" in navigator)navigator.serviceWorker.register("service-worker.js");
+loadReport();render();
+</script>
+</body></html>
